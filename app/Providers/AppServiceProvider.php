@@ -62,6 +62,9 @@ class AppServiceProvider extends ServiceProvider
 
             return \App\Util\Lexer\PrettyNumber::size($value, true);
         });
+
+        // Force Carbon to use app locale
+        \Carbon\Carbon::setLocale(config('app.locale'));
     }
 
     /**
