@@ -10,6 +10,8 @@ RUN apt-get update \
       libfreetype6 libicu-dev libjpeg62-turbo libpng16-16 libxpm4 libwebp6 libmagickwand-6.q16-3 \
       libfreetype6-dev libjpeg62-turbo-dev libpng-dev libxpm-dev libwebp-dev libmagickwand-dev \
  && sed -i '/en_US/s/^#//g' /etc/locale.gen \
+ && sed -i '/de_AT/s/^#//g' /etc/locale.gen \
+ && sed -i '/de_DE/s/^#//g' /etc/locale.gen \
  && locale-gen && update-locale \
  && docker-php-source extract \
  && docker-php-ext-configure gd \
