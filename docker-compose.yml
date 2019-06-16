@@ -23,8 +23,8 @@ services:
     #   - traefik.frontend.rule=Host:your.url
     #   - traefik.port=80
     ## If you have a standard reverse proxy, uncommit this to expose Pixelfed
-    # ports:
-    #   - "127.0.0.1:8080:80"
+    ports:
+      - "8080:80"
     env_file:
       - ./.env
     volumes:
@@ -50,7 +50,7 @@ services:
     command: gosu www-data php artisan horizon
     
   db:
-    image: mysql:8.0
+    image: mysql:5.7
     restart: unless-stopped
     networks:
       - internal
