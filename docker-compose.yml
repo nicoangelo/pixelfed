@@ -48,7 +48,14 @@ services:
       - external  # Required for ActivityPub
       - internal
     command: gosu www-data php artisan horizon
-    
+
+  slideshow:
+    image: matsperl/knw
+    network_mode: "host"
+    ports:
+      - "8081:8081"
+    command: "http://localhost:8080"
+
   db:
     image: mysql:5.7
     restart: unless-stopped
