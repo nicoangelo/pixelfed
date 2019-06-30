@@ -117,7 +117,7 @@
 							<div v-if="!modes.distractionFree" class="reactions my-1">
 								<h3 v-bind:class="[status.favourited ? 'fas fa-heart text-danger pr-3 m-0 cursor-pointer' : 'far fa-heart pr-3 m-0 like-btn cursor-pointer']" title="Like" v-on:click="likeStatus(status, $event)"></h3>
 								<h3 v-if="!status.comments_disabled" class="far fa-comment pr-3 m-0 cursor-pointer" title="Comment" v-on:click="commentFocus(status, $event)"></h3>
-								<h3 v-bind:class="[status.reblogged ? 'far fa-share-square pr-3 m-0 text-primary cursor-pointer' : 'far fa-share-square pr-3 m-0 share-btn cursor-pointer']" title="Share" v-on:click="shareStatus(status, $event)"></h3>
+								<h3 v-if="status.visibility == 'public'" v-bind:class="[status.reblogged ? 'far fa-share-square pr-3 m-0 text-primary cursor-pointer' : 'far fa-share-square pr-3 m-0 share-btn cursor-pointer']" title="Share" v-on:click="shareStatus(status, $event)"></h3>
 							</div>
 
 							<div class="likes font-weight-bold" v-if="expLc(status) == true && !modes.distractionFree">
@@ -133,14 +133,14 @@
 							</div>
 							<div class="comments" v-if="status.id == replyId && !status.comments_disabled">
 								<p class="mb-0 d-flex justify-content-between align-items-top read-more" style="overflow-y: hidden;" v-for="(reply, index) in replies">
-									<span>
-										<a class="text-dark font-weight-bold mr-1" :href="reply.account.url">{{reply.account.username}}</a>
-										<span v-html="reply.content"></span>
-									</span>
-									<span class="mb-0" style="min-width:38px">
-										<span v-on:click="likeStatus(reply, $event)"><i v-bind:class="[reply.favourited ? 'fas fa-heart fa-sm text-danger':'far fa-heart fa-sm text-lighter']"></i></span>
-										<post-menu :status="reply" :profile="profile" size="sm" :modal="'true'" :feed="feed" class="d-inline-flex pl-2"></post-menu>
-									</span>
+										<span>
+											<a class="text-dark font-weight-bold mr-1" :href="reply.account.url">{{reply.account.username}}</a>
+											<span v-html="reply.content"></span>
+										</span>
+										<span class="mb-0" style="min-width:38px">
+											<span v-on:click="likeStatus(reply, $event)"><i v-bind:class="[reply.favourited ? 'fas fa-heart fa-sm text-danger':'far fa-heart fa-sm text-lighter']"></i></span>
+											<post-menu :status="reply" :profile="profile" size="sm" :modal="'true'" :feed="feed" class="d-inline-flex pl-2"></post-menu>
+										</span>
 								</p>
 							</div>
 							<div class="timestamp mt-2">
@@ -182,7 +182,7 @@
 						</div>
 					</div>
 				</div>
-				<div v-if="modes.infinite == true && !loading && feed.length > 0">
+				<div v-if="!loading && feed.length > 0">
 					<div class="card">
 						<div class="card-body">
 							<infinite-loading @infinite="infiniteTimeline" :distance="800">
@@ -191,9 +191,6 @@
 							</infinite-loading>
 						</div>
 					</div>
-				</div>
-				<div v-if="modes.infinite == false && !loading && feed.length > 0" class="pagination">
-					<p class="btn btn-outline-secondary font-weight-bold btn-block" v-on:click="loadMore">Load more posts</p>
 				</div>
 				<div v-if="!loading && scope == 'home' && feed.length == 0">
 					<div class="card">
@@ -223,7 +220,7 @@
 										<p class="my-0 text-muted pb-0">{{profile.display_name || 'loading...'}}</p>
 									</div>
 									<div class="ml-2">
-										<a :class="[optionMenuState == true ? 'text-primary' :'text-muted']" v-on:click="toggleOptionsMenu()"><i class="fas fa-cog fa-lg"></i></a>
+										<a class="text-muted" href="/settings/home"><i class="fas fa-cog fa-lg"></i></a>
 									</div>
 								</div>
 							</div>
@@ -244,28 +241,6 @@
 								</span>
 							</div>
 						</div> -->
-					</div>
-				</div>
-
-				<div v-if="optionMenuState == true" class="mb-4">
-					<div class="card options-card">
-						<div class="card-body small">
-							<div v-if="profile.is_admin" class="custom-control custom-switch mb-3">
-								<input type="checkbox" class="custom-control-input" id="mode-mod" v-on:click="modeModToggle()" v-model="modes.mod">
-								<label class="custom-control-label font-weight-bold" for="mode-mod">Moderator Mode</label>
-							</div>
-							<!-- <div class="custom-control custom-switch mb-3">
-								<input type="checkbox" class="custom-control-input" id="mode-notify" v-on:click="modeNotifyToggle()"  v-model="!modes.notify">
-								<label class="custom-control-label font-weight-bold" for="mode-notify">Disable Notifications</label>
-							</div> -->
-							<div class="custom-control custom-switch">
-								<input type="checkbox" class="custom-control-input" id="mode-infinite" v-on:click="modeInfiniteToggle()" v-model="modes.infinite">
-								<label class="custom-control-label font-weight-bold" for="mode-infinite">Enable Infinite Scroll</label>
-							</div>
-							<hr>
-							<p class="font-weight-bold">BETA FEATURES</p>
-							<div class="alert alert-primary font-weight-bold text-center">Experimental features have been moved to the <a href="/settings/labs">Labs</a> settings page.</div>
-						</div>
 					</div>
 				</div>
 
@@ -447,12 +422,10 @@
 				loading: true,
 				replies: [],
 				replyId: null,
-				optionMenuState: false,
 				modes: {
 					'mod': false,
 					'dark': false,
 					'notify': true,
-					'infinite': true,
 					'distractionFree': false
 				},
 				followers: [],
@@ -476,6 +449,13 @@
 				this.config = res.data;
 				this.fetchProfile();
 				this.fetchTimelineApi();
+
+				// if(this.config.announcement.enabled == true) {
+				// 	let msg = $('<div>')
+				// 	.addClass('alert alert-warning mb-0 rounded-0 text-center font-weight-bold')
+				// 	.html(this.config.announcement.message);
+				// 	$('body').prepend(msg);
+				// }
 			});
 		},
 
@@ -723,7 +703,9 @@
 			fetchStatusComments(status, card) {
 				axios.get('/api/v2/status/'+status.id+'/replies')
 				.then(res => {
-					let data = res.data;
+					let data = res.data.filter(res => {
+						return res.sensitive == false;
+					});
 					this.replies = _.reverse(data);
 				}).catch(err => {
 				})
@@ -773,7 +755,9 @@
 					type: 'status',
 					item: status.id
 				}).then(res => {
-					this.feed.splice(index,1);
+					this.feed = this.feed.filter(s => {
+						return s.id != status.id;
+					})
 					swal('Success', 'You have successfully deleted this post', 'success');
 				}).catch(err => {
 					swal('Error', 'Something went wrong. Please try again later.', 'error');
@@ -930,49 +914,6 @@
 						});
 					break;
 				}
-			},
-
-			toggleOptionsMenu() {
-				this.optionMenuState = !this.optionMenuState;
-			},
-
-			modeModToggle() {
-				this.modes.mod = !this.modes.mod;
-				//window.ls.set('pixelfed-classicui-settings', this.modes);
-			},
-
-			modeNotifyToggle() {
-				this.modes.notify = !this.modes.notify;
-				//window.ls.set('pixelfed-classicui-settings', this.modes);
-			},
-
-			modeDarkToggle() {
-				// todo: more graceful stylesheet change
-				if(this.modes.dark == true) {
-					axios.post('/i/metro/dark-mode', {
-						mode: 'light'
-					}).then(res => {
-						$('link[data-stylesheet=dark]')
-						.attr('data-stylesheet', 'light')
-						.attr('href', '/css/app.css?v=' + Date.now());
-						this.modes.dark = false;
-					});
-				} else {
-					axios.post('/i/metro/dark-mode', {
-						mode: 'dark'
-					}).then(res => {
-						$('link[data-stylesheet=light]')
-						.attr('data-stylesheet', 'dark')
-						.attr('href', '/css/appdark.css?v=' + Date.now());
-						this.modes.dark = true;
-					});
-				}
-				//window.ls.set('pixelfed-classicui-settings', this.modes);
-			},
-
-			modeInfiniteToggle() {
-				this.modes.infinite = !this.modes.infinite
-				//window.ls.set('pixelfed-classicui-settings', this.modes);
 			},
 
 			followingModal() {

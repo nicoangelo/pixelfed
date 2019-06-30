@@ -27,14 +27,14 @@ class StatusTransformer extends Fractal\TransformerAbstract
             'content'                   => $status->rendered ?? $status->caption,
             'created_at'                => $status->created_at->format('c'),
             'emojis'                    => [],
-            'reblogs_count'             => $status->shares()->count(),
-            'favourites_count'          => $status->likes()->count(),
+            'reblogs_count'             => $status->reblogs_count != 0 ? $status->reblogs_count: $status->shares()->count(),
+            'favourites_count'          => $status->likes_count != 0 ? $status->likes_count: $status->likes()->count(),
             'reblogged'                 => $status->shared(),
             'favourited'                => $status->liked(),
             'muted'                     => null,
             'sensitive'                 => (bool) $status->is_nsfw,
             'spoiler_text'              => $status->cw_summary,
-            'visibility'                => $status->visibility,
+            'visibility'                => $status->visibility ?? $status->scope,
             'application'               => [
                 'name'      => 'web',
                 'website'   => null
@@ -47,7 +47,7 @@ class StatusTransformer extends Fractal\TransformerAbstract
             'comments_disabled'         => $status->comments_disabled ? true : false,
             'thread'                    => false,
             'replies'                   => [],
-            'parent'                    => $status->parent() ? $this->transform($status->parent()) : [],
+            'parent'                    => [],
         ];
     }
 
@@ -67,8 +67,8 @@ class StatusTransformer extends Fractal\TransformerAbstract
 
     public function includeMediaAttachments(Status $status)
     {
-        return Cache::remember('status:transformer:media:attachments:'.$status->id, now()->addMinutes(3), function() use($status) {
-            if(in_array($status->type, ['photo', 'video', 'photo:album', 'loop'])) {
+        return Cache::remember('status:transformer:media:attachments:'.$status->id, now()->addDays(14), function() use($status) {
+            if(in_array($status->type, ['photo', 'video', 'photo:album', 'loop', 'photo:video:album'])) {
                 $media = $status->media()->orderBy('order')->get();
                 return $this->collection($media, new MediaTransformer());
             }

@@ -42,14 +42,19 @@ class SiteController extends Controller
 
     public function about()
     {
-        $stats = Cache::remember('site:about', now()->addMinutes(120), function() {
-            return [
+        return Cache::remember('site:about', now()->addHours(12), function() {
+            $page = Page::whereSlug('/site/about')->whereActive(true)->first();
+            $stats = [
                 'posts' => Status::whereLocal(true)->count(),
-                'users' => User::count(),
+                'users' => User::whereNull('status')->count(),
                 'admin' => User::whereIsAdmin(true)->first()
             ];
+            if($page) {
+                return View::make('site.about-custom')->with(compact('page', 'stats'))->render();
+            } else {
+                return View::make('site.about')->with(compact('stats'))->render();
+            }
         });
-        return view('site.about', compact('stats'));
     }
 
     public function language()
@@ -59,9 +64,28 @@ class SiteController extends Controller
 
     public function communityGuidelines(Request $request)
     {
-        $slug = '/site/kb/community-guidelines';
-        $page = Page::whereSlug($slug)->whereActive(true)->first();
-        return view('site.help.community-guidelines', compact('page'));
+        return Cache::remember('site:help:community-guidelines', now()->addDays(120), function() {
+            $slug = '/site/kb/community-guidelines';
+            $page = Page::whereSlug($slug)->whereActive(true)->first();
+            return View::make('site.help.community-guidelines')->with(compact('page'))->render();
+        });
     }
 
+    public function privacy(Request $request)
+    {
+        return Cache::remember('site:privacy', now()->addDays(120), function() {
+            $slug = '/site/privacy';
+            $page = Page::whereSlug($slug)->whereActive(true)->first();
+            return View::make('site.privacy')->with(compact('page'))->render();
+        });
+    }
+
+    public function terms(Request $request)
+    {
+        return Cache::remember('site:terms', now()->addDays(120), function() {
+            $slug = '/site/terms';
+            $page = Page::whereSlug($slug)->whereActive(true)->first();
+            return View::make('site.terms')->with(compact('page'))->render();
+        });
+    }
 }

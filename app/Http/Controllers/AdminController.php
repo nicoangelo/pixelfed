@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\{
+  Contact,
   FailedJob,
   Hashtag,
   Instance,
@@ -17,13 +18,13 @@ use App\{
 use DB, Cache;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Jackiedo\DotenvEditor\DotenvEditor;
 use App\Http\Controllers\Admin\{
   AdminDiscoverController,
   AdminInstanceController,
   AdminReportController,
   AdminMediaController,
-  AdminSettingsController
+  AdminSettingsController,
+  AdminSupportController
 };
 use App\Util\Lexer\PrettyNumber;
 use Illuminate\Validation\Rule;
@@ -47,6 +48,10 @@ class AdminController extends Controller
         $data = Cache::remember('admin:dashboard:home:data', now()->addMinutes(15), function() {
           $day = config('database.default') == 'pgsql' ? 'DATE_PART(\'day\',' : 'day(';
           return [
+            'contact' => [
+              'count' => PrettyNumber::convert(Contact::whereNull('read_at')->count()),
+              'graph' => Contact::selectRaw('count(*) as count, '.$day.'created_at) as day')->whereNull('read_at')->whereBetween('created_at',[now()->subDays(14), now()])->groupBy('day')->orderBy('day')->pluck('count')
+            ],
             'failedjobs' => [
               'count' => PrettyNumber::convert(FailedJob::where('failed_at', '>=', \Carbon\Carbon::now()->subDay())->count()),
               'graph' => FailedJob::selectRaw('count(*) as count, '.$day.'failed_at) as d')->groupBy('d')->whereBetween('failed_at',[now()->subDays(24), now()])->orderBy('d')->pluck('count')
@@ -101,7 +106,7 @@ class AdminController extends Controller
         $col = $request->query('col') ?? 'id';
         $dir = $request->query('dir') ?? 'desc';
         $stats = $this->collectUserStats($request);
-        $users = User::withCount('statuses')->orderBy($col, $dir)->paginate(10);
+        $users = User::withCount('statuses')->orderBy($col, $dir)->simplePaginate(10);
 
         return view('admin.users.home', compact('users', 'stats'));
     }
@@ -115,7 +120,7 @@ class AdminController extends Controller
 
     public function statuses(Request $request)
     {
-        $statuses = Status::orderBy('id', 'desc')->paginate(10);
+        $statuses = Status::orderBy('id', 'desc')->simplePaginate(10);
 
         return view('admin.statuses.home', compact('statuses'));
     }
@@ -207,11 +212,11 @@ class AdminController extends Controller
       $order = $request->input('order') ?? 'desc';
       $limit = $request->input('limit') ?? 12;
       if($search) {
-        $profiles = Profile::select('id','username')->where('username','like', "%$search%")->orderBy('id','desc')->paginate($limit);
+        $profiles = Profile::select('id','username')->where('username','like', "%$search%")->orderBy('id','desc')->simplePaginate($limit);
       } else if($filter && $order) {
-        $profiles = Profile::select('id','username')->withCount(['likes','statuses','followers'])->orderBy($filter, $order)->paginate($limit);
+        $profiles = Profile::select('id','username')->withCount(['likes','statuses','followers'])->orderBy($filter, $order)->simplePaginate($limit);
       } else {
-        $profiles = Profile::select('id','username')->orderBy('id','desc')->paginate($limit);
+        $profiles = Profile::select('id','username')->orderBy('id','desc')->simplePaginate($limit);
       }
 
       return view('admin.profiles.home', compact('profiles'));
@@ -248,4 +253,30 @@ class AdminController extends Controller
       return view('admin.hashtags.home', compact('hashtags'));
     }
 
+    public function messagesHome(Request $request)
+    {
+      $messages = Contact::orderByDesc('id')->paginate(10);
+      return view('admin.messages.home', compact('messages'));
+    }
+
+    public function messagesShow(Request $request, $id)
+    {
+      $message = Contact::findOrFail($id);
+      return view('admin.messages.show', compact('message'));
+    }
+
+    public function messagesMarkRead(Request $request)
+    {
+      $this->validate($request, [
+        'id' => 'required|integer|min:1'
+      ]);
+      $id = $request->input('id');
+      $message = Contact::findOrFail($id);
+      if($message->read_at) {
+        return;
+      }
+      $message->read_at = now();
+      $message->save();
+      return;
+    }
 }

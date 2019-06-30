@@ -55,8 +55,8 @@ class Helpers {
 
 		$activity = $data['object'];
 
-		$mediaTypes = ['Document', 'Image', 'Video'];
-		$mimeTypes = ['image/jpeg', 'image/png', 'video/mp4'];
+		$mimeTypes = explode(',', config('pixelfed.media_types'));
+		$mediaTypes = in_array('video/mp4', $mimeTypes) ? ['Document', 'Image', 'Video'] : ['Document', 'Image'];
 
 		if(!isset($activity['attachment']) || empty($activity['attachment'])) {
 			return false;
@@ -146,9 +146,13 @@ class Helpers {
 
 		$host = parse_url($valid, PHP_URL_HOST);
 
+		if(count(dns_get_record($host, DNS_A | DNS_AAAA)) == 0) {
+			return false;
+		}
+
 		if(config('costar.enabled') == true) {
 			if(
-				(config('costar.domain.block') != null && in_array($host, config('costar.domain.block')) == true) || 
+				(config('costar.domain.block') != null && Str::contains($host, config('costar.domain.block')) == true) || 
 				(config('costar.actor.block') != null && in_array($url, config('costar.actor.block')) == true)
 			) {
 				return false;
@@ -202,7 +206,7 @@ class Helpers {
 		return self::fetchFromUrl($url);
 	}
 
-	public static function statusFirstOrFetch($url, $replyTo = true)
+	public static function statusFirstOrFetch($url, $replyTo = false)
 	{
 		$url = self::validateUrl($url);
 		if($url == false) {
@@ -249,7 +253,6 @@ class Helpers {
 			}
 
 			if(isset($res['cc']) == true) {
-				$scope = 'unlisted';
 				if(is_array($res['cc']) && in_array('https://www.w3.org/ns/activitystreams#Public', $res['cc'])) {
 					$scope = 'unlisted';
 				}
@@ -283,6 +286,12 @@ class Helpers {
 				} else {
 					$cw = isset($activity['sensitive']) ? (bool) $activity['sensitive'] : false;
 				}
+			}
+
+			if(!self::validateUrl($res['id']) ||
+			   !self::validateUrl($activity['object']['attributedTo'])
+			) {
+				abort(400, 'Invalid object url');
 			}
 
 			$idDomain = parse_url($res['id'], PHP_URL_HOST);
@@ -319,7 +328,7 @@ class Helpers {
 				$status->scope = $scope;
 				$status->visibility = $scope;
 				$status->save();
-				// self::importNoteAttachment($res, $status);
+				self::importNoteAttachment($res, $status);
 				return $status;
 			});
 
@@ -328,10 +337,13 @@ class Helpers {
 		}
 	}
 
+	public static function statusFetch($url)
+	{
+		return self::statusFirstOrFetch($url);
+	}
+
 	public static function importNoteAttachment($data, Status $status)
 	{
-		return;
-
 		if(self::verifyAttachments($data) == false) {
 			return;
 		}
@@ -341,6 +353,7 @@ class Helpers {
 		$userHash = hash('sha1', $user->id.(string) $user->created_at);
 		$storagePath = "public/m/{$monthHash}/{$userHash}";
 		$allowed = explode(',', config('pixelfed.media_types'));
+
 		foreach($attachments as $media) {
 			$type = $media['mediaType'];
 			$url = $media['url'];
@@ -348,29 +361,32 @@ class Helpers {
 			if(in_array($type, $allowed) == false || $valid == false) {
 				continue;
 			}
-			// $info = pathinfo($url);
+			$info = pathinfo($url);
 
-			// // pleroma attachment fix
-			// $url = str_replace(' ', '%20', $url);
+			// pleroma attachment fix
+			$url = str_replace(' ', '%20', $url);
 
-			// $img = file_get_contents($url, false, stream_context_create(['ssl' => ["verify_peer"=>true,"verify_peer_name"=>true]]));
-			// $file = '/tmp/'.str_random(32);
-			// file_put_contents($file, $img);
-			// $fdata = new File($file);
-			// $path = Storage::putFile($storagePath, $fdata, 'public');
-			// $media = new Media();
-			// $media->status_id = $status->id;
-			// $media->profile_id = $status->profile_id;
-			// $media->user_id = null;
-			// $media->media_path = $path;
-			// $media->size = $fdata->getSize();
-			// $media->mime = $fdata->getMimeType();
-			// $media->save();
+			$img = file_get_contents($url, false, stream_context_create(['ssl' => ["verify_peer"=>true,"verify_peer_name"=>true]]));
+			$file = '/tmp/pxmi-'.str_random(32);
+			file_put_contents($file, $img);
+			$fdata = new File($file);
+			$path = Storage::putFile($storagePath, $fdata, 'public');
+			$media = new Media();
+			$media->remote_media = true;
+			$media->status_id = $status->id;
+			$media->profile_id = $status->profile_id;
+			$media->user_id = null;
+			$media->media_path = $path;
+			$media->size = $fdata->getSize();
+			$media->mime = $fdata->getMimeType();
+			$media->save();
 
-			// ImageThumbnail::dispatch($media);
-			// ImageOptimize::dispatch($media);
-			// unlink($file);
+			ImageThumbnail::dispatch($media);
+			ImageOptimize::dispatch($media);
+			unlink($file);
 		}
+		
+		$status->viewType();
 		return;
 	}
 
@@ -392,7 +408,10 @@ class Helpers {
 			return;
 		}
 		$domain = parse_url($res['id'], PHP_URL_HOST);
-		$username = Purify::clean($res['preferredUsername']);
+		$username = (string) Purify::clean($res['preferredUsername']);
+		if(empty($username)) {
+			return;
+		}
 		$remoteUsername = "@{$username}@{$domain}";
 
 		abort_if(!self::validateUrl($res['inbox']), 400);
@@ -401,9 +420,9 @@ class Helpers {
 
 		$profile = Profile::whereRemoteUrl($res['id'])->first();
 		if(!$profile) {
-			$profile = new Profile;
+			$profile = new Profile();
 			$profile->domain = $domain;
-			$profile->username = Purify::clean($remoteUsername);
+			$profile->username = (string) Purify::clean($remoteUsername);
 			$profile->name = Purify::clean($res['name']) ?? 'user';
 			$profile->bio = Purify::clean($res['summary']);
 			$profile->sharedInbox = isset($res['endpoints']) && isset($res['endpoints']['sharedInbox']) ? $res['endpoints']['sharedInbox'] : null;
@@ -419,6 +438,11 @@ class Helpers {
 			}
 		}
 		return $profile;
+	}
+
+	public static function profileFetch($url)
+	{
+		return self::profileFirstOrNew($url);
 	}
 
 	public static function sendSignedObject($senderProfile, $url, $body)

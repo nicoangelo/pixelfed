@@ -242,7 +242,7 @@
 									<div class="reactions my-1" v-if="user.hasOwnProperty('id')">
 										<h3 v-bind:class="[status.favourited ? 'fas fa-heart text-danger pr-3 m-0 cursor-pointer' : 'far fa-heart pr-3 m-0 like-btn cursor-pointer']" title="Like" v-on:click="likeStatus(status, $event)"></h3>
 										<h3 class="far fa-comment pr-3 m-0 cursor-pointer" title="Comment" v-on:click="commentFocus(status, $event)"></h3>
-										<h3 v-bind:class="[status.reblogged ? 'far fa-share-square pr-3 m-0 text-primary cursor-pointer' : 'far fa-share-square pr-3 m-0 share-btn cursor-pointer']" title="Share" v-on:click="shareStatus(status, $event)"></h3>
+										<h3 v-if="status.visibility == 'public'" v-bind:class="[status.reblogged ? 'far fa-share-square pr-3 m-0 text-primary cursor-pointer' : 'far fa-share-square pr-3 m-0 share-btn cursor-pointer']" title="Share" v-on:click="shareStatus(status, $event)"></h3>
 									</div>
 
 									<div class="likes font-weight-bold">
@@ -579,7 +579,7 @@ export default {
 				}
 			})
 			.then(res => {
-				let data = res.data;
+				let data = res.data.filter(status => status.media_attachments.length > 0);
 				let ids = data.map(status => status.id);
 				this.ids = ids;
 				this.min_id = Math.max(...ids);
@@ -791,10 +791,12 @@ export default {
 					'id[]': this.profileId
 				}
 			}).then(res => {
+				if(res.data.length) {
 					this.relationship = res.data[0];
 					if(res.data[0].blocking == true) {
 						this.warning = true;
 					}
+				}
 			});
 		},
 

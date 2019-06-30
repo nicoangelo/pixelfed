@@ -68,7 +68,7 @@
 								</b-carousel-slide>
 							</b-carousel>
 						</div>
-						<div v-if="ids.length > 0" class="bg-dark align-items-center">
+						<div v-if="ids.length > 0 && media[carouselCursor].type == 'Image'" class="bg-dark align-items-center">
 							<ul class="nav media-drawer-filters text-center">
 								<li class="nav-item">
 									<div class="p-1 pt-3">
@@ -202,10 +202,6 @@
 						</div>
 					</div>
 				</div>
-
-				<div class="card-footer py-1">
-					<p class="text-center mb-0 font-weight-bold text-muted small">Having issues? You can also use the <a href="/i/compose">Classic Compose UI</a>.</p>
-				</div>
 			</div>
 		</div>
 	</div>
@@ -249,9 +245,11 @@
 		color: #fff;
 		font-weight: bold;
 	}
-	.media-drawer-filters::-webkit-scrollbar {
-	    display: none;
-	}
+    @media (hover: none) and (pointer: coarse) {
+	    .media-drawer-filters::-webkit-scrollbar {
+	        display: none;
+	    }
+    }
 </style>
 <script type="text/javascript">
 export default {
@@ -473,6 +471,15 @@ export default {
 
 		compose() {
 			let state = this.composeState;
+
+			if(this.uploadProgress != 100 || this.ids.length == 0) {
+				return;
+			}
+
+			if(this.composeText.length > this.config.uploader.max_caption_length) {
+				swal('Error', 'Caption is too long', 'error');
+				return;
+			}
 
 			switch(state) {
 				case 'publish' :

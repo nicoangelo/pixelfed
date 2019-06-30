@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\InboxPipeline\InboxWorker;
+use App\Jobs\InboxPipeline\{
+    InboxWorker,
+    InboxValidator
+};
 use App\Jobs\RemoteFollowPipeline\RemoteFollowPipeline;
 use App\{
     AccountLog,
@@ -18,17 +21,17 @@ use Cache;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use League\Fractal;
-use App\Util\ActivityPub\Helpers;
-use App\Util\ActivityPub\HttpSignature;
+use App\Util\ActivityPub\{
+    Helpers,
+    HttpSignature
+};
 use \Zttp\Zttp;
 
 class FederationController extends Controller
 {
     public function authCheck()
     {
-        if (!Auth::check()) {
-            return abort(403);
-        }
+        abort_if(!Auth::check(), 403);
     }
 
     public function authorizeFollow(Request $request)
@@ -52,14 +55,14 @@ class FederationController extends Controller
 
     public function remoteFollowStore(Request $request)
     {
+        return;
+
         $this->authCheck();
         $this->validate($request, [
             'url' => 'required|string',
         ]);
 
-        if (config('pixelfed.remote_follow_enabled') !== true) {
-            abort(403);
-        }
+        abort_if(!config('federation.activitypub.remoteFollow'), 403);
 
         $follower = Auth::user()->profile;
         $url = $request->input('url');
@@ -76,6 +79,8 @@ class FederationController extends Controller
 
     public function nodeinfoWellKnown()
     {
+        abort_if(!config('federation.nodeinfo.enabled'), 404);
+
         $res = [
         'links' => [
           [
@@ -90,6 +95,8 @@ class FederationController extends Controller
 
     public function nodeinfo()
     {
+        abort_if(!config('federation.nodeinfo.enabled'), 404);
+
         $res = Cache::remember('api:nodeinfo', now()->addMinutes(15), function () {
             $activeHalfYear = Cache::remember('api:nodeinfo:ahy', now()->addHours(12), function() {
                 $count = collect([]);
@@ -150,6 +157,8 @@ class FederationController extends Controller
 
     public function webfinger(Request $request)
     {
+        abort_if(!config('federation.webfinger.enabled'), 404);
+
         $this->validate($request, ['resource'=>'required|string|min:3|max:255']);
 
         $resource = $request->input('resource');
@@ -167,22 +176,18 @@ class FederationController extends Controller
 
     public function hostMeta(Request $request)
     {
+        abort_if(!config('federation.webfinger.enabled'), 404);
+
         $path = route('well-known.webfinger');
-        $xml = <<<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<XRD xmlns="http://docs.oasis-open.org/ns/xri/xrd-1.0">
-  <Link rel="lrdd" type="application/xrd+xml" template="{$path}?resource={uri}"/>
-</XRD>
-XML;
+        $xml = '<?xml version="1.0" encoding="UTF-8"?><XRD xmlns="http://docs.oasis-open.org/ns/xri/xrd-1.0"><Link rel="lrdd" type="application/xrd+xml" template="'.$path.'?resource={uri}"/></XRD>';
 
         return response($xml)->header('Content-Type', 'application/xrd+xml');
     }
 
     public function userOutbox(Request $request, $username)
     {
-        if (config('pixelfed.activitypub_enabled') == false) {
-            abort(403);
-        }
+        abort_if(!config('federation.activitypub.enabled'), 404);
+        abort_if(!config('federation.activitypub.outbox'), 404);
 
         $profile = Profile::whereNull('remote_url')->whereUsername($username)->firstOrFail();
         if($profile->status != null) {
@@ -201,10 +206,12 @@ XML;
 
     public function userInbox(Request $request, $username)
     {
-        if (config('pixelfed.activitypub_enabled') == false) {
-            abort(403);
-        }
+        abort_if(!config('federation.activitypub.enabled'), 404);
+        abort_if(!config('federation.activitypub.inbox'), 404);
 
+        // $headers = $request->headers->all();
+        // $payload = $request->getContent();
+        // InboxValidator::dispatch($username, $headers, $payload);
         $profile = Profile::whereNull('domain')->whereUsername($username)->firstOrFail();
         if($profile->status != null) {
             return ProfileController::accountCheck($profile);
@@ -220,6 +227,7 @@ XML;
         }
         return;
     }
+
 
     protected function verifySignature(Request $request, Profile $profile)
     {
@@ -300,15 +308,17 @@ XML;
 
     public function userFollowing(Request $request, $username)
     {
-        if (config('pixelfed.activitypub_enabled') == false) {
-            abort(403);
-        }
+        abort_if(!config('federation.activitypub.enabled'), 404);
+
         $profile = Profile::whereNull('remote_url')
             ->whereUsername($username)
             ->whereIsPrivate(false)
             ->firstOrFail();
+            
+        return [];
+
         if($profile->status != null) {
-            return ProfileController::accountCheck($profile);
+            return [];
         }
         $obj = [
             '@context' => 'https://www.w3.org/ns/activitystreams',
@@ -324,15 +334,17 @@ XML;
 
     public function userFollowers(Request $request, $username)
     {
-        if (config('pixelfed.activitypub_enabled') == false) {
-            abort(403);
-        }
+        abort_if(!config('federation.activitypub.enabled'), 404);
+
         $profile = Profile::whereNull('remote_url')
             ->whereUsername($username)
             ->whereIsPrivate(false)
             ->firstOrFail();
+
+        return [];
+
         if($profile->status != null) {
-            return ProfileController::accountCheck($profile);
+            return [];
         }
         $obj = [
             '@context' => 'https://www.w3.org/ns/activitystreams',

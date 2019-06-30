@@ -2,6 +2,13 @@
 
 @section('section')
 
+	@if($page && $page->content)
+	<div class="title">
+		<h3 class="font-weight-bold">Terms Of Use</h3>
+	</div>
+	<hr>
+	{!! $page->content !!}
+	@else
 	<div class="title">
 		<h3 class="font-weight-bold">Terms Of Use</h3>
 	</div>
@@ -36,9 +43,11 @@
 	<p class="">Pixelfed may revise these terms of service for its website at any time without notice. By using this website you are agreeing to be bound by the then current version of these terms of service.</p>
 	<h5 class="font-weight-bold">8. Governing Law</h5>
 	<p class="">These terms and conditions are governed by and construed in accordance with the laws of Canada and you irrevocably submit to the exclusive jurisdiction of the courts in that State or location.</p>
-	<h5 class="font-weight-bold">9. Additional Rules</h5>
+	<h5 class="font-weight-bold">9. Community Guidelines</h5>
+	<p class="">You can view our Community Guidelines <a href="{{route('help.community-guidelines')}}">here</a>.</p>
+	<h5 class="font-weight-bold">10. Additional Rules</h5>
 	<p class="">This website does not have any additional rules.</p>
-
+	@endif
 @endsection
 
 @push('meta')
