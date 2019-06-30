@@ -30,6 +30,21 @@ services:
     volumes:
       - "app-storage:/var/www/storage"
       - "app-bootstrap:/var/www/bootstrap"
+      - "./resources/lang:/var/www/resources/lang"
+    networks:
+      - external
+      - internal
+
+  app-api:
+    # Comment to use dockerhub image
+    build: .
+    image: pixelfed
+    restart: unless-stopped
+    env_file:
+      - ./.env-api
+    volumes:
+      - "app-storage:/var/www/storage"
+      - "app-api-bootstrap:/var/www/bootstrap"
     networks:
       - external
       - internal
@@ -54,6 +69,9 @@ services:
     restart: unless-stopped
     networks:
       - internal
+      - external
+    ports:
+      - "3006:3306"
     environment:
       - MYSQL_DATABASE=pixelfed
       - MYSQL_USER=${DB_USERNAME}
@@ -75,7 +93,8 @@ volumes:
   redis-data:
   db-data:
   app-storage:
-  app-bootstrap:  
+  app-bootstrap:
+  app-api-bootstrap:
 
 networks:
   internal:
