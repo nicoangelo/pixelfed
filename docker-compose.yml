@@ -30,7 +30,6 @@ services:
     volumes:
       - "app-storage:/var/www/storage"
       - "app-bootstrap:/var/www/bootstrap"
-      - "./resources/lang:/var/www/resources/lang"
     networks:
       - external
       - internal
