@@ -12,6 +12,7 @@
         "ext-json": "*",
         "ext-mbstring": "*",
         "ext-openssl": "*",
+        "ateam-group/laravel-sso": "^1.0",
         "beyondcode/laravel-self-diagnosis": "^1.0.2",
         "doctrine/dbal": "^2.7",
         "fideloper/proxy": "^4.0",

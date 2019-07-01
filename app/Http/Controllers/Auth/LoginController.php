@@ -5,7 +5,11 @@ namespace App\Http\Controllers\Auth;
 use App\AccountLog;
 use App\Http\Controllers\Controller;
 use App\User;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class LoginController extends Controller
 {
@@ -18,7 +22,7 @@ class LoginController extends Controller
     | redirecting them to your home screen. The controller uses a trait
     | to conveniently provide its functionality to your applications.
     |
-    */
+     */
 
     use AuthenticatesUsers;
 
@@ -50,7 +54,7 @@ class LoginController extends Controller
     {
         $rules = [
             $this->username() => 'required|email',
-            'password'        => 'required|string|min:6',
+            'password' => 'required|string|min:6',
         ];
 
         $this->validate($request, $rules);
@@ -66,7 +70,7 @@ class LoginController extends Controller
      */
     protected function authenticated($request, $user)
     {
-        if($user->status == 'deleted') {
+        if (!isset($user) || $user->status == 'deleted') {
             return;
         }
 
@@ -80,5 +84,41 @@ class LoginController extends Controller
         $log->ip_address = $request->ip();
         $log->user_agent = $request->userAgent();
         $log->save();
+    }
+
+    protected function attemptLogin(Request $request)
+    {
+        $broker = new \Zefy\LaravelSSO\LaravelSSOBroker;
+
+        $credentials = $this->credentials($request);
+        if (Auth::attempt($credentials)) {
+            return true;
+        } else {
+            // try to login via SSO broker
+            $broker_login = $broker->login($credentials[$this->username()], $credentials['password']);
+            if ($broker_login) {
+                $user_info = $broker->getUserInfo();
+                $broker_user = User::create([
+                    'name' => $user_info['data']['name'],
+                    'username' => $user_info['data']['name'],
+                    'email' => $user_info['data']['email'],
+                    'password' => Hash::make(str_random(20)),
+                ]);
+                event(new Registered($broker_user));
+            }
+
+            return $broker_login;
+        }
+    }
+
+    public function logout(Request $request)
+    {
+        $broker = new \Zefy\LaravelSSO\LaravelSSOBroker;
+
+        $broker->logout();
+        $this->guard()->logout();
+        $request->session()->invalidate();
+
+        return redirect('/');
     }
 }
