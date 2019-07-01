@@ -96,11 +96,12 @@ class LoginController extends Controller
         } else {
             // try to login via SSO broker
             $broker_login = $broker->login($credentials[$this->username()], $credentials['password']);
-            if ($broker_login) {
+            
+            if ($broker_login && !User::where('email', $credentials[$this->username()])->exists()) {
                 $user_info = $broker->getUserInfo();
                 $broker_user = User::create([
                     'name' => $user_info['data']['name'],
-                    'username' => $user_info['data']['name'],
+                    'username' => str_replace(' ', '_', $user_info['data']['name']),
                     'email' => $user_info['data']['email'],
                     'password' => Hash::make(str_random(20)),
                 ]);
